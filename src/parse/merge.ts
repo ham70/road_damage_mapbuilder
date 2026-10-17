@@ -5,7 +5,7 @@ import {
   type MetricColumn,
   type ParseResult,
   type SkippedColumn,
-} from '../model/track';
+} from '../data_model/track';
 import { MIN_NUMERIC_RATIO, isLat, isLong, isTime, parseCell, parseRows } from './csv';
 
 export interface NamedCsv {

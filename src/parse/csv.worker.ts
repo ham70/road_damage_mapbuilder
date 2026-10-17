@@ -1,4 +1,4 @@
-import { ParseError, type ParseResult } from '../model/track';
+import { ParseError, type ParseResult } from '../data_model/track';
 import { parseCsvText } from './csv';
 import { parseMergedCsvTexts, type NamedCsv } from './merge';
 

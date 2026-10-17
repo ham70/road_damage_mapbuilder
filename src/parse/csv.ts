@@ -5,7 +5,7 @@ import {
   type MetricColumn,
   type ParseResult,
   type SkippedColumn,
-} from '../model/track';
+} from '../data_model/track';
 import type { WorkerRequest, WorkerResponse } from './csv.worker';
 
 /** A column is a score column when at least this share of non-empty values are numeric. */
