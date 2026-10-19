@@ -2,12 +2,52 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>road_damage_mapbuilder</title>
+    <title>Road Damage Heatmap</title>
+    <style>
+      html, body, #map { margin: 0; height: 100%; width: 100%; }
+      #toolbar {
+        position: absolute; top: 10px; left: 10px; z-index: 1; max-width: calc(100% - 70px);
+        display: flex; flex-direction: column; gap: 6px; font: 14px system-ui, sans-serif;
+      }
+      #toolbar label {
+        background: #fff; padding: 6px 12px; border-radius: 4px; cursor: pointer;
+        box-shadow: 0 1px 4px rgba(0,0,0,.3); align-self: flex-start;
+      }
+      #toolbar input[type=file] { display: none; }
+      #controls {
+        background: #fff; padding: 6px 10px; border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,.3);
+        display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center;
+      }
+      #controls label { background: none; padding: 0; box-shadow: none; cursor: default; }
+      #controls input[type=number] { width: 4em; }
+      #status {
+        background: #fff; padding: 6px 10px; border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,.3);
+      }
+      #status.error { background: #fff0f0; color: #a00; }
+      #legend {
+        position: absolute; bottom: 28px; left: 10px; z-index: 1; width: 240px; max-width: calc(100% - 20px);
+        background: #fff; padding: 6px 10px; border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,.3);
+        font: 12px system-ui, sans-serif;
+      }
+      .legend-title { font-weight: 600; margin-bottom: 4px; }
+      .legend-bar { height: 10px; border-radius: 2px; }
+      .legend-labels { display: flex; justify-content: space-between; margin-top: 2px; }
+      #map.dragging { outline: 3px dashed #e8590c; outline-offset: -3px; }
+    </style>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="toolbar">
+      <label>Open CSV(s)<input id="file-input" type="file" multiple accept=".csv,text/csv" /></label>
+      <div id="controls" hidden>
+        <label>Column <select id="metric"></select></label>
+        <label><input id="smooth" type="checkbox" /> Smooth</label>
+        <label>Window <input id="window" type="number" min="3" step="2" value="5" disabled /></label>
+      </div>
+      <div id="status" hidden></div>
+    </div>
+    <div id="legend" hidden></div>
+    <div id="map"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

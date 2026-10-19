@@ -1,60 +1,77 @@
-import './style.css'
-import heroImg from './assets/hero.png'
-import typescriptLogo from './assets/typescript.svg'
-import viteLogo from './assets/vite.svg'
-import { setupCounter } from './counter.ts'
+import { initMap } from './map/map';
+import { fitToTrack, segmentsToGeoJSON, setSegments } from './map/trackLayer';
+import { createColorFn, DEFAULT_PALETTE } from './color/scale';
+import { dataRange, percentileDomain, rollingMedian } from './metrics/stats';
+import { buildSegments } from './data_model/segments';
+import { ParseError, type Track } from './data_model/track';
+import { renderLegend } from './ui/legend';
+import { parseCsvFiles } from './parse/csv';
+import { setStatus, setupFileInput, setupMetricControls, type ControlState } from './ui/controls';
 
-document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
-<section id="center">
-  <div class="hero">
-    <img src="${heroImg}" class="base" width="170" height="179">
-    <img src="${typescriptLogo}" class="framework" alt="TypeScript logo"/>
-    <img src="${viteLogo}" class="vite" alt="Vite logo" />
-  </div>
-  <div>
-    <h1>Get started</h1>
-    <p>Edit <code>src/main.ts</code> and save to test <code>HMR</code></p>
-  </div>
-  <button id="counter" type="button" class="counter"></button>
-</section>
+const container = document.getElementById('map');
+const input = document.getElementById('file-input') as HTMLInputElement | null;
+const status = document.getElementById('status');
+if (!container || !input || !status) throw new Error('Missing required page elements');
 
-<div class="ticks"></div>
+const legend = document.getElementById('legend');
+if (!legend) throw new Error('Missing #legend element');
+const map = initMap(container);
 
-<section id="next-steps">
-  <div id="docs">
-    <svg class="icon" role="presentation" aria-hidden="true"><use href="/icons.svg#documentation-icon"></use></svg>
-    <h2>Documentation</h2>
-    <p>Your questions, answered</p>
-    <ul>
-      <li>
-        <a href="https://vite.dev/" target="_blank">
-          <img class="logo" src="${viteLogo}" alt="" />
-          Explore Vite
-        </a>
-      </li>
-      <li>
-        <a href="https://www.typescriptlang.org" target="_blank">
-          <img class="button-icon" src="${typescriptLogo}" alt="">
-          Learn more
-        </a>
-      </li>
-    </ul>
-  </div>
-  <div id="social">
-    <svg class="icon" role="presentation" aria-hidden="true"><use href="/icons.svg#social-icon"></use></svg>
-    <h2>Connect with us</h2>
-    <p>Join the Vite community</p>
-    <ul>
-      <li><a href="https://github.com/vitejs/vite" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#github-icon"></use></svg>GitHub</a></li>
-      <li><a href="https://chat.vite.dev/" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#discord-icon"></use></svg>Discord</a></li>
-      <li><a href="https://x.com/vite_js" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#x-icon"></use></svg>X.com</a></li>
-      <li><a href="https://bsky.app/profile/vite.dev" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#bluesky-icon"></use></svg>Bluesky</a></li>
-    </ul>
-  </div>
-</section>
+let current: Track | null = null;
+let state: ControlState = { metricIndex: 0, smoothing: false, window: 5 };
 
-<div class="ticks"></div>
-<section id="spacer"></section>
-`
+/** Smoothing affects color only; geometry always uses the raw track. */
+function render(track: Track, { metricIndex, smoothing, window }: ControlState): void {
+  const metric = track.metrics[metricIndex];
+  if (!metric) return;
+  const values = smoothing ? rollingMedian(metric.values, window) : metric.values;
+  const domain = percentileDomain(values);
+  if (!domain) {
+    throw new ParseError(`Column "${metric.name}" has no values to color.`);
+  }
+  const opts = { palette: DEFAULT_PALETTE, domain, invert: false };
+  const segments = buildSegments(track, values);
+  setSegments(map, segmentsToGeoJSON(segments, createColorFn(opts)));
+  renderLegend(legend as HTMLElement, metric.name, opts.palette, opts.invert, domain, dataRange(values));
+}
 
-setupCounter(document.querySelector<HTMLButtonElement>('#counter')!)
+const controls = setupMetricControls(
+  document.getElementById('metric') as HTMLSelectElement,
+  document.getElementById('smooth') as HTMLInputElement,
+  document.getElementById('window') as HTMLInputElement,
+  (next) => {
+    state = next;
+    if (!current) return;
+    try {
+      render(current, state);
+    } catch (e) {
+      setStatus(status as HTMLElement, e instanceof Error ? e.message : String(e), true);
+    }
+  },
+);
+
+async function loadFiles(files: File[]): Promise<void> {
+  const label = files.map((f) => f.name).join(', ');
+  setStatus(status as HTMLElement, `Loading ${label}…`);
+  try {
+    const { track, dropped, skipped } = await parseCsvFiles(files);
+    current = track;
+    controls.setMetrics(track.metrics.map((m) => m.name));
+    state = { metricIndex: 0, smoothing: false, window: 5 };
+    (document.getElementById('controls') as HTMLElement).hidden = false;
+    render(track, state);
+    fitToTrack(map, track);
+    const notes = [`${track.lat.length} points`];
+    if (dropped.length) {
+      const first = dropped[0];
+      notes.push(`${dropped.length} rows dropped (first: line ${first?.row}, ${first?.reason})`);
+    }
+    if (skipped.length) notes.push(`skipped columns: ${skipped.map((s) => s.name).join(', ')}`);
+    setStatus(status as HTMLElement, notes.join(' · '));
+  } catch (e) {
+    const msg = e instanceof ParseError ? e.message : `Could not load ${label}: ${String(e)}`;
+    setStatus(status as HTMLElement, msg, true);
+  }
+}
+
+setupFileInput(container, input, (fs) => void loadFiles(fs));
