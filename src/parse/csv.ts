@@ -102,7 +102,7 @@ export function parseRows(rows: string[][], { allowNoScores = false } = {}): Par
   }
   metrics.push({ name: header[0] as string, values: time.map((v) => (v === null || Number.isNaN(v) ? null : v)) });
 
-  return { track: { lat, lon, metrics, rows: lineNumbers }, dropped, skipped };
+  return { track: { lat, lon, metrics, rows: lineNumbers }, dropped, skipped, bumpEvents: [] };
 }
 
 /** Parse CSV text synchronously (small inputs, tests). */

@@ -1,12 +1,13 @@
-import type { GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl';
+import { Marker, Popup, type GeoJSONSource, type Map as MapLibreMap } from 'maplibre-gl';
 import type { Feature, FeatureCollection, LineString } from 'geojson';
-import { trackBounds, type Track } from '../data_model/track';
+import { trackBounds, type BumpEvent, type Track } from '../data_model/track';
 import type { Segment } from '../data_model/segments';
 
 const SOURCE = 'track';
 const CASING = 'track-casing';
 const LINE = 'track-line';
 const FIT_PADDING = 48;
+let bumpMarkers: Marker[] = [];
 
 /** One LineString feature per segment, colored via the precomputed `color` property. */
 export function segmentsToGeoJSON(
@@ -55,6 +56,37 @@ export function setSegments(map: MapLibreMap, data: FeatureCollection<LineString
   };
   if (map.isStyleLoaded()) apply();
   else map.once('load', apply);
+}
+
+/** Show clickable DOM markers at the GPS points associated with candidate spikes. */
+export function setBumpEvents(map: MapLibreMap, events: BumpEvent[]): void {
+  bumpMarkers.forEach((marker) => marker.remove());
+  bumpMarkers = events.map((event) => {
+    const element = document.createElement('button');
+    element.type = 'button';
+    element.setAttribute('aria-label', `Candidate spike at ${event.time.toFixed(2)} seconds`);
+    element.title = `Candidate spike at ${event.time.toFixed(2)} s`;
+    Object.assign(element.style, {
+      width: '30px',
+      height: '30px',
+      padding: '0',
+      border: '4px solid #ffea00',
+      borderRadius: '50%',
+      background: '#e03131',
+      boxShadow: '0 0 0 2px #ffffff, 0 2px 6px rgba(0, 0, 0, 0.75)',
+      cursor: 'pointer',
+    });
+    const details = document.createElement('div');
+    details.textContent =
+      `Candidate spike at ${event.time.toFixed(2)} s ` +
+      `(excess ${event.excess.toFixed(2)} m/s²); ` +
+      `nearest GPS sample ${event.gpsDelta.toFixed(2)} s away.`;
+    const marker = new Marker({ element, anchor: 'center' })
+      .setLngLat([event.longitude, event.latitude])
+      .setPopup(new Popup().setDOMContent(details))
+      .addTo(map);
+    return marker;
+  });
 }
 
 export function fitToTrack(map: MapLibreMap, track: Track): void {

@@ -7,6 +7,7 @@ import {
   type SkippedColumn,
 } from '../data_model/track';
 import { MIN_NUMERIC_RATIO, isLat, isLong, isTime, parseCell, parseRows } from './csv';
+import { detectBumpEvents, type AccelerationSample, type GpsSample } from '../metrics/bumps';
 
 export interface NamedCsv {
   name: string;
@@ -16,6 +17,52 @@ export interface NamedCsv {
 export interface NamedTable {
   name: string;
   rows: string[][];
+}
+
+function detectBumps(tables: NamedTable[]): ReturnType<typeof detectBumpEvents> {
+  let accelerationTable: { table: NamedTable; time: number; x: number; y: number; z: number } | undefined;
+  let gpsTable: { table: NamedTable; time: number; lat: number; lon: number } | undefined;
+  for (const table of tables) {
+    const header = table.rows[0]?.map((cell) => cell.trim().toLowerCase()) ?? [];
+    const time = header.findIndex(isTime);
+    const x = header.indexOf('x (m/s^2)');
+    const y = header.indexOf('y (m/s^2)');
+    const z = header.indexOf('z (m/s^2)');
+    if (time >= 0 && x >= 0 && y >= 0 && z >= 0) accelerationTable = { table, time, x, y, z };
+
+    const lat = header.findIndex(isLat);
+    const lon = header.findIndex(isLong);
+    if (time >= 0 && lat >= 0 && lon >= 0) gpsTable = { table, time, lat, lon };
+  }
+  if (!accelerationTable || !gpsTable) return [];
+
+  const acceleration: AccelerationSample[] = [];
+  for (const row of accelerationTable.table.rows.slice(1)) {
+    const cells = row ?? [];
+    const time = parseCell(cells[accelerationTable.time]);
+    const x = parseCell(cells[accelerationTable.x]);
+    const y = parseCell(cells[accelerationTable.y]);
+    const z = parseCell(cells[accelerationTable.z]);
+    if ([time, x, y, z].every((value) => value !== null && Number.isFinite(value))) {
+      acceleration.push({ time: time as number, x: x as number, y: y as number, z: z as number });
+    }
+  }
+
+  const gps: GpsSample[] = [];
+  for (const row of gpsTable.table.rows.slice(1)) {
+    const cells = row ?? [];
+    const time = parseCell(cells[gpsTable.time]);
+    const latitude = parseCell(cells[gpsTable.lat]);
+    const longitude = parseCell(cells[gpsTable.lon]);
+    if (
+      time !== null && Number.isFinite(time) &&
+      latitude !== null && Number.isFinite(latitude) && Math.abs(latitude) <= 90 &&
+      longitude !== null && Number.isFinite(longitude) && Math.abs(longitude) <= 180
+    ) {
+      gps.push({ time, latitude, longitude });
+    }
+  }
+  return detectBumpEvents(acceleration, gps);
 }
 
 /** Header (trimmed) of a table, or an error naming the file if it doesn't start with "Time (s)". */
@@ -145,7 +192,7 @@ export function mergeTables(tables: NamedTable[]): ParseResult {
     metrics.push(...resampleTable(t, headers[i] as string[], timeMetric.values, taken, dropped, skipped));
   });
 
-  return { track: { ...result.track, metrics }, dropped, skipped };
+  return { track: { ...result.track, metrics }, dropped, skipped, bumpEvents: detectBumps(tables) };
 }
 
 /** Parse and merge CSV texts (small inputs, tests, worker). */

@@ -1,5 +1,5 @@
 import { initMap } from './map/map';
-import { fitToTrack, segmentsToGeoJSON, setSegments } from './map/trackLayer';
+import { fitToTrack, segmentsToGeoJSON, setBumpEvents, setSegments } from './map/trackLayer';
 import { createColorFn, DEFAULT_PALETTE } from './color/scale';
 import { dataRange, percentileDomain, rollingMedian } from './metrics/stats';
 import { buildSegments } from './data_model/segments';
@@ -54,14 +54,16 @@ async function loadFiles(files: File[]): Promise<void> {
   const label = files.map((f) => f.name).join(', ');
   setStatus(status as HTMLElement, `Loading ${label}…`);
   try {
-    const { track, dropped, skipped } = await parseCsvFiles(files);
+    const { track, dropped, skipped, bumpEvents } = await parseCsvFiles(files);
     current = track;
     controls.setMetrics(track.metrics.map((m) => m.name));
     state = { metricIndex: 0, smoothing: false, window: 5 };
     (document.getElementById('controls') as HTMLElement).hidden = false;
     render(track, state);
+    setBumpEvents(map, bumpEvents);
     fitToTrack(map, track);
     const notes = [`${track.lat.length} points`];
+    if (bumpEvents.length) notes.push(`${bumpEvents.length} candidate spikes marked`);
     if (dropped.length) {
       const first = dropped[0];
       notes.push(`${dropped.length} rows dropped (first: line ${first?.row}, ${first?.reason})`);

@@ -23,10 +23,22 @@ export interface SkippedColumn {
   reason: string;
 }
 
+/** A candidate accelerometer spike associated with a nearby GPS sample. */
+export interface BumpEvent {
+  time: number;
+  magnitude: number;
+  excess: number;
+  latitude: number;
+  longitude: number;
+  gpsTime: number;
+  gpsDelta: number;
+}
+
 export interface ParseResult {
   track: Track;
   dropped: DroppedRow[];
   skipped: SkippedColumn[];
+  bumpEvents: BumpEvent[];
 }
 
 /** User-facing parse failure with a specific message. */
