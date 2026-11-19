@@ -15,14 +15,21 @@ Node.js LTS
 A browser
 Internet access for the OpenFreeMap basemap tiles
 
+How to clean environment
+PS C:\Users\username\...\road_damage_mapbuilder> if (Test-Path .\node_modules) {
+  Remove-Item -LiteralPath .\node_modules -Recurse -Force
+}
+
 How to Run locally
-First instal dependencies
+Make sure file path is something similar to 
+PS C:\Users\username\...\road_damage_mapbuilder>
+First install dependencies
 
 Inside powershell
-npm.cmd install
+PS C:\Users\username\...\road_damage_mapbuilder> npm.cmd install
 
 Then start the development server
-npm.cmd run dev
+PS C:\Users\username\...\road_damage_mapbuilder> npm.cmd run dev
 
 Open the local URL printed in the terminal, usually something like http://localhost:5173/.
 
