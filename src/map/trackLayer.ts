@@ -8,6 +8,7 @@ const CASING = 'track-casing';
 const LINE = 'track-line';
 const FIT_PADDING = 48;
 let bumpMarkers: Marker[] = [];
+let bumpsVisible = true;
 
 /** One LineString feature per segment, colored via the precomputed `color` property. */
 export function segmentsToGeoJSON(
@@ -83,10 +84,19 @@ export function setBumpEvents(map: MapLibreMap, events: BumpEvent[]): void {
       `nearest GPS sample ${event.gpsDelta.toFixed(2)} s away.`;
     const marker = new Marker({ element, anchor: 'center' })
       .setLngLat([event.longitude, event.latitude])
-      .setPopup(new Popup().setDOMContent(details))
-      .addTo(map);
+      .setPopup(new Popup().setDOMContent(details));
+    if (bumpsVisible) marker.addTo(map);
     return marker;
   });
+}
+
+/** Show or hide the bump markers. The markers are kept, so they come back without re-parsing. */
+export function setBumpsVisible(map: MapLibreMap, visible: boolean): void {
+  bumpsVisible = visible;
+  for (const marker of bumpMarkers) {
+    if (visible) marker.addTo(map);
+    else marker.remove(); // also closes any open popup
+  }
 }
 
 export function fitToTrack(map: MapLibreMap, track: Track): void {

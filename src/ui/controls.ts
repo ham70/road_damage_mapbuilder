@@ -47,9 +47,17 @@ export interface ControlState {
 
 export const DEFAULT_SMOOTHING_WINDOW = 5;
 
+export interface MetricGroup {
+  label: string;
+  names: string[];
+}
+
 export interface MetricControls {
-  /** Fill the dropdown and reset to the first column with smoothing off. */
-  setMetrics(names: string[]): void;
+  /**
+   * Fill the dropdown (one <optgroup> per non-empty group) and reset to the first entry with
+   * smoothing off. `metricIndex` counts entries across all groups in order.
+   */
+  setMetrics(groups: MetricGroup[]): void;
 }
 
 /** Metric dropdown + smoothing toggle/window. Calls `onChange` whenever any of them changes. */
@@ -76,14 +84,24 @@ export function setupMetricControls(
   windowInput.addEventListener('change', changed);
 
   return {
-    setMetrics(names) {
+    setMetrics(groups) {
+      let index = 0;
       select.replaceChildren(
-        ...names.map((name, i) => {
-          const opt = document.createElement('option');
-          opt.value = String(i);
-          opt.textContent = name;
-          return opt;
-        }),
+        ...groups
+          .filter((g) => g.names.length > 0)
+          .map((g) => {
+            const group = document.createElement('optgroup');
+            group.label = g.label;
+            group.append(
+              ...g.names.map((name) => {
+                const opt = document.createElement('option');
+                opt.value = String(index++);
+                opt.textContent = name;
+                return opt;
+              }),
+            );
+            return group;
+          }),
       );
       select.selectedIndex = 0;
       smoothBox.checked = false;

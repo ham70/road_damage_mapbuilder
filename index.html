@@ -31,6 +31,7 @@
         font: 12px system-ui, sans-serif;
       }
       .legend-title { font-weight: 600; margin-bottom: 4px; }
+      .legend-desc { color: #555; margin: -2px 0 4px; }
       .legend-bar { height: 10px; border-radius: 2px; }
       .legend-labels { display: flex; justify-content: space-between; margin-top: 2px; }
       #map.dragging { outline: 3px dashed #e8590c; outline-offset: -3px; }
@@ -40,9 +41,10 @@
     <div id="toolbar">
       <label>Open CSV(s)<input id="file-input" type="file" multiple accept=".csv,text/csv" /></label>
       <div id="controls" hidden>
-        <label>Column <select id="metric"></select></label>
+        <label>Color by <select id="metric"></select></label>
         <label><input id="smooth" type="checkbox" /> Smooth</label>
         <label>Window <input id="window" type="number" min="3" step="2" value="5" disabled /></label>
+        <label><input id="show-bumps" type="checkbox" checked /> Show bumps</label>
       </div>
       <div id="status" hidden></div>
     </div>

@@ -36,12 +36,17 @@ export function renderLegend(
   invert: boolean,
   domain: Domain,
   data: Domain | null,
+  description?: string,
 ): void {
   const { low, high } = legendLabels(domain, data);
   el.replaceChildren();
   const title = document.createElement('div');
   title.className = 'legend-title';
   title.textContent = name;
+  const desc = document.createElement('div');
+  desc.className = 'legend-desc';
+  desc.textContent = description ?? '';
+  desc.hidden = !description;
   const bar = document.createElement('div');
   bar.className = 'legend-bar';
   bar.style.background = gradientCss(palette, invert);
@@ -52,6 +57,6 @@ export function renderLegend(
   const h = document.createElement('span');
   h.textContent = high;
   labels.append(l, h);
-  el.append(title, bar, labels);
+  el.append(title, desc, bar, labels);
   el.hidden = false;
 }

@@ -2,6 +2,21 @@
 export interface MetricColumn {
   name: string;
   values: (number | null)[];
+  /** Optional explanation shown under the legend title (used by scores). */
+  description?: string;
+}
+
+/**
+ * One raw CSV column at its native sample rate (not resampled onto the track). Only finite
+ * values are kept, and `time` is ascending.
+ */
+export interface Series {
+  /** Source file name, e.g. "Accelerometer.csv" ('' when unknown). */
+  file: string;
+  /** Column header as written in the file, e.g. "X (m/s^2)". */
+  name: string;
+  time: number[];
+  values: number[];
 }
 
 /** Column-oriented track; index i across lat/lon/metrics/rows refers to the same point. */
@@ -39,6 +54,8 @@ export interface ParseResult {
   dropped: DroppedRow[];
   skipped: SkippedColumn[];
   bumpEvents: BumpEvent[];
+  /** Every numeric column of every file at its native rate, for scoring functions. */
+  series: Series[];
 }
 
 /** User-facing parse failure with a specific message. */

@@ -4,9 +4,10 @@ import {
   type DroppedRow,
   type MetricColumn,
   type ParseResult,
+  type Series,
   type SkippedColumn,
 } from '../data_model/track';
-import { MIN_NUMERIC_RATIO, isLat, isLong, isTime, parseCell, parseRows } from './csv';
+import { MIN_NUMERIC_RATIO, isLat, isLong, isTime, makeSeries, parseCell, parseRows } from './csv';
 import { detectBumpEvents, type AccelerationSample, type GpsSample } from '../metrics/bumps';
 
 export interface NamedCsv {
@@ -105,6 +106,7 @@ function resampleTable(
   taken: Set<string>,
   dropped: DroppedRow[],
   skipped: SkippedColumn[],
+  series: Series[],
 ): MetricColumn[] {
   const times: number[] = [];
   const cols: (number | null)[][] = header.slice(1).map(() => []);
@@ -145,6 +147,7 @@ function resampleTable(
     if (values.every((v) => v === null)) {
       return void skipped.push({ name: label, reason: 'no overlap with the lat/long time range' });
     }
+    series.push(makeSeries(t.name, raw, times, col));
     const name = taken.has(raw) ? `${raw} (${t.name})` : raw;
     taken.add(name);
     metrics.push({ name, values });
@@ -173,7 +176,7 @@ export function mergeTables(tables: NamedTable[]): ParseResult {
   const timeName = baseHeader[0] as string;
   let result: ParseResult;
   try {
-    result = parseRows(base.rows, { allowNoScores: true });
+    result = parseRows(base.rows, { allowNoScores: true, fileName: base.name });
   } catch (e) {
     if (e instanceof ParseError) throw new ParseError(`${base.name}: ${e.message}`);
     throw e;
@@ -186,13 +189,14 @@ export function mergeTables(tables: NamedTable[]): ParseResult {
   const dropped = [...result.dropped];
   const skipped = [...result.skipped];
   const metrics = [...result.track.metrics];
+  const series = [...result.series];
   const taken = new Set(metrics.map((m) => m.name));
   tables.forEach((t, i) => {
     if (i === geoIdx[0]) return;
-    metrics.push(...resampleTable(t, headers[i] as string[], timeMetric.values, taken, dropped, skipped));
+    metrics.push(...resampleTable(t, headers[i] as string[], timeMetric.values, taken, dropped, skipped, series));
   });
 
-  return { track: { ...result.track, metrics }, dropped, skipped, bumpEvents: detectBumps(tables) };
+  return { track: { ...result.track, metrics }, dropped, skipped, bumpEvents: detectBumps(tables), series };
 }
 
 /** Parse and merge CSV texts (small inputs, tests, worker). */

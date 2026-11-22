@@ -11,7 +11,8 @@ export type WorkerResponse =
 self.onmessage = (e: MessageEvent<WorkerRequest>) => {
   let response: WorkerResponse;
   try {
-    response = { ok: true, result: e.data.length === 1 ? parseCsvText((e.data[0] as NamedCsv).text) : parseMergedCsvTexts(e.data) };
+    const single = e.data.length === 1 ? (e.data[0] as NamedCsv) : null;
+    response = { ok: true, result: single ? parseCsvText(single.text, single.name) : parseMergedCsvTexts(e.data) };
   } catch (err) {
     response = {
       ok: false,

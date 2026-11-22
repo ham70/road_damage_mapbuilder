@@ -4,6 +4,7 @@ import {
   type DroppedRow,
   type MetricColumn,
   type ParseResult,
+  type Series,
   type SkippedColumn,
 } from '../data_model/track';
 import type { WorkerRequest, WorkerResponse } from './csv.worker';
@@ -18,6 +19,22 @@ export function parseCell(raw: string | undefined): number | null {
   if (s === '') return null;
   const n = Number(s);
   return Number.isFinite(n) ? n : NaN;
+}
+
+/** Pair up times and values, keeping only finite pairs, sorted by time. */
+export function makeSeries(
+  file: string,
+  name: string,
+  times: (number | null)[],
+  values: (number | null)[],
+): Series {
+  const pairs: [number, number][] = [];
+  times.forEach((t, i) => {
+    const v = values[i];
+    if (t !== null && Number.isFinite(t) && v !== null && v !== undefined && Number.isFinite(v)) pairs.push([t, v]);
+  });
+  if (pairs.some((p, i) => i > 0 && p[0] < (pairs[i - 1] as [number, number])[0])) pairs.sort((a, b) => a[0] - b[0]);
+  return { file, name, time: pairs.map((p) => p[0]), values: pairs.map((p) => p[1]) };
 }
 
 const norm = (h: string | undefined) => (h ?? '').trim().toLowerCase();
@@ -41,7 +58,7 @@ function coordinateProblem(lat: number | null, lon: number | null): string | nul
  * candidate score. Time is kept as the last metric column. With `allowNoScores`, a file with
  * only time/lat/long is accepted (its scores come from merged sensor files).
  */
-export function parseRows(rows: string[][], { allowNoScores = false } = {}): ParseResult {
+export function parseRows(rows: string[][], { allowNoScores = false, fileName = '' } = {}): ParseResult {
   const header = rows[0]?.map((h) => h.trim());
   if (!header || header.every((h) => h === '')) throw new ParseError('The file is empty.');
   if (!isTime(header[0]) || !isLat(header[1]) || !isLong(header[2])) {
@@ -79,6 +96,7 @@ export function parseRows(rows: string[][], { allowNoScores = false } = {}): Par
   }
 
   const metrics: MetricColumn[] = [];
+  const series: Series[] = [];
   const skipped: SkippedColumn[] = [];
   raw.forEach((col, c) => {
     const name = header[c + 3] || `column ${c + 4}`;
@@ -90,6 +108,7 @@ export function parseRows(rows: string[][], { allowNoScores = false } = {}): Par
       skipped.push({ name, reason: 'not numeric' });
     } else {
       metrics.push({ name, values: col.map((v) => (v === null || Number.isNaN(v) ? null : v)) });
+      series.push(makeSeries(fileName, name, time, col));
     }
   });
 
@@ -102,13 +121,13 @@ export function parseRows(rows: string[][], { allowNoScores = false } = {}): Par
   }
   metrics.push({ name: header[0] as string, values: time.map((v) => (v === null || Number.isNaN(v) ? null : v)) });
 
-  return { track: { lat, lon, metrics, rows: lineNumbers }, dropped, skipped, bumpEvents: [] };
+  return { track: { lat, lon, metrics, rows: lineNumbers }, dropped, skipped, bumpEvents: [], series };
 }
 
 /** Parse CSV text synchronously (small inputs, tests). */
-export function parseCsvText(text: string): ParseResult {
+export function parseCsvText(text: string, fileName = ''): ParseResult {
   const result = Papa.parse<string[]>(text, { skipEmptyLines: true });
-  return parseRows(result.data);
+  return parseRows(result.data, { fileName });
 }
 
 /**
